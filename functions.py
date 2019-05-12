@@ -27,34 +27,50 @@ def computeMATT(X, y_bin, idx_public, model, params):
     auxmodel.fit(X_public, 0.5 * (1 + y_bin[idx_public]).ravel())
 
     # Compute gradient of all samples according to this new model
-    auxgradients = -expit(-y_bin * np.dot(X, auxmodel.coef_.T))*y_bin*X
+    auxgradients = -expit(-y_bin * np.dot(X, auxmodel.coef_.T)) * y_bin * X
 
-    # Compute (and inverse) hessian of auxiliary model
-    hess_left = expit(np.dot(X_public, auxmodel.coef_.T)) * X_public
-    hess_right = expit(-np.dot(X_public, auxmodel.coef_.T)) * X_public
-    hess = (params['C'] * np.dot(hess_left.T, hess_right) / hess_right.shape[0]) + np.eye(hess_right.shape[1])
-    hess_inverse = np.linalg.inv(hess)
+    # Check gradient formula
+    # auxgrad2 = approx_grad(auxmodel, X, y_bin)
+    # assert np.allclose(auxgradients, auxgrad2)
 
     # Compute MATT
     matt = - np.dot(auxgradients, model.coef_[0] - auxmodel.coef_[0])
 
     return matt
 
+
 def computeMetrics(indicator_train, indicator_test):
+    """
+    Compute accuracy and mean average precision given by indicators
+    We assume that the indicators are supposed to have low value for test elements (e.g. - loss of the model)
+    """
+    assert indicator_train.shape[0] == indicator_test.shape[0]
+
     order = np.argsort(np.concatenate([indicator_train, indicator_test]))
     gt = np.concatenate([np.ones_like(indicator_train), np.zeros_like(indicator_test)])
-    s = np.cumsum(gt[order])
-    
-    map_train = float(100*computemAP(gt[order][None,::-1]))
-    map_test = float(100*computemAP(1 - gt[order][None,:]))
-    acc = float(100*np.max((np.arange(gt.shape[0]) - 2 * s + s[-1]) / gt.shape[0]))
+
+    accuracies = [(np.sum(gt[order[:n0]] == 0) + np.sum(gt[order[n0:]] == 1)) for n0 in range(gt.shape[0])]
+    # s = np.cumsum(gt[order])
+    # s = np.insert(s, 0, 0)
+    # assert np.all(accuracies == (np.arange(gt.shape[0] + 1) - 2 * s + s[-1])[:gt.shape[0]])
+
+    map_train = float(100 * computemAP(gt[order][None,::-1]))
+    map_test =  float(100 * computemAP(1 - gt[order][None,:]))
+    acc =       float(100 * np.max(accuracies) / gt.shape[0])
 
     return map_train, map_test, acc
 
 
-#def getMultiLaplace(X, y_bin, idx_public, n_tr, p, model, params):
-#    matt = np.zeros((X.shape[0]))
-#    for _ in range(p):
-#        matt += computeMATT(X, y_bin, np.random.choice(idx_public, n_tr, replace=False), model, params)
-#
-#    return matt
+def approx_grad(model, X, y_bin):
+    eps = 1e-3
+    grads = np.zeros((X.shape[0], model.coef_.shape[1]))
+    for i in range(model.coef_.shape[1]):
+        model.coef_[0, i] += eps
+        loss_plus  = - model.predict_log_proba(X)[np.arange(X.shape[0]), ((1 + y_bin) / 2).ravel().astype(int)]
+        model.coef_[0, i] -= 2 * eps
+        loss_minus = - model.predict_log_proba(X)[np.arange(X.shape[0]), ((1 + y_bin) / 2).ravel().astype(int)]
+        model.coef_[0, i] += eps
+
+        grads[:, i] += (loss_plus - loss_minus) / (2 * eps)
+
+    return grads
