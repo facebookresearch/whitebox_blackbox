@@ -17,7 +17,7 @@ parser = argparse.ArgumentParser()
 parser.add_argument("--arch", type=str, choices=model_names)
 parser.add_argument("--bs", type=int, default=4)
 parser.add_argument("--dest", type=str, default=".")
-parser.add_argument("--epochs", type=int, default=71)
+parser.add_argument("--epochs", type=int, default=50)
 parser.add_argument("--gpu", action='store_true', dest='gpu')
 parser.add_argument("--lr", type=float, default=0.001)
 parser.add_argument("--momentum", type=float, default=0.9)
@@ -30,7 +30,7 @@ print(args)
 torch.cuda.manual_seed_all(args.seed)
 transform = getTransform(0)
 
-root_data = '/private/home/asablayrolles/data/cifar-dejalight'
+root_data = '/private/home/asablayrolles/data/cifar-dejalight2'
 nclasses = 10
 trainset = CIFAR10(root=root_data, name=args.name,
                                         download=False, transform=transform)
