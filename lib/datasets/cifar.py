@@ -10,7 +10,7 @@ import torchvision
 class CIFAR10(torchvision.datasets.CIFAR10):
     def __init__(self, root, name,
                  transform=None, target_transform=None,
-                 download=False, spit_index=False):
+                 download=False):
 
         self.root = os.path.expanduser(root)
         self.transform = transform
@@ -18,7 +18,6 @@ class CIFAR10(torchvision.datasets.CIFAR10):
 
         self.data = np.load(join(self.root, "data_%s.npy" % name))
         self.labels = np.load(join(self.root, "label_%s.npy" % name))
-        self.spit_index = spit_index
 
     def __getitem__(self, index):
         """
@@ -39,10 +38,7 @@ class CIFAR10(torchvision.datasets.CIFAR10):
         if self.target_transform is not None:
             target = self.target_transform(target)
 
-        if self.spit_index:
-            return index, img, target
-        else:
-            return img, target
+        return img, target
 
     def __len__(self):
         return len(self.data)

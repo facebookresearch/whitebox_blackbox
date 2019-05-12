@@ -1,15 +1,13 @@
-# -*- coding: utf-8 -*-
 from __future__ import division
-import _init_paths
 import time
 import torch
-from datasets.cifar import CIFAR10
 import torch.optim as optim
 import torch.nn as nn
 import argparse
 from os.path import join
-from utils import test, getTransform, boolify
-import models
+from lib.utils import test, getTransform
+from lib.datasets.cifar import CIFAR10
+from lib import models
 
 model_names = sorted(name for name in models.__dict__
     if name.islower() and not name.startswith("__")
@@ -17,11 +15,9 @@ model_names = sorted(name for name in models.__dict__
 
 parser = argparse.ArgumentParser()
 parser.add_argument("--arch", type=str, choices=model_names)
-parser.add_argument("--bs", type=int, default=16)
-parser.add_argument("--decay", type=boolify, default=False)
+parser.add_argument("--bs", type=int, default=4)
 parser.add_argument("--dest", type=str, default=".")
 parser.add_argument("--epochs", type=int, default=71)
-parser.add_argument("--data-aug", type=int, default=0)
 parser.add_argument("--gpu", action='store_true', dest='gpu')
 parser.add_argument("--lr", type=float, default=0.001)
 parser.add_argument("--momentum", type=float, default=0.9)
@@ -32,7 +28,7 @@ args = parser.parse_args()
 print(args)
 
 torch.cuda.manual_seed_all(args.seed)
-transform = getTransform(args.data_aug)
+transform = getTransform(0)
 
 root_data = '/private/home/asablayrolles/data/cifar-dejalight'
 nclasses = 10
@@ -85,19 +81,16 @@ for epoch in range(args.epochs):
 
     if best_val is None:
         best_val = val_accuracy
-    if val_accuracy < best_val:
-        if args.decay:
-            print("Dividing learning rate by 1.1")
-            args.lr /= 1.1
-        optimizer = optim.SGD(net.parameters(), lr=args.lr, momentum=args.momentum)
-
     best_val = val_accuracy
 
     if args.dest != "." and (epoch % 10 == 0 or epoch < 20):
         if args.gpu:
             net = net.cpu()
-        print "Saving model"
-        torch.save({'net': net.state_dict(), 'args': args}, join(args.dest, "%s_epoch=%d.pth" % (args.arch, epoch)))
+        print("Saving model")
+        torch.save({
+            'net': net.state_dict(),
+            'args': args
+        }, join(args.dest, "%s_epoch=%d.pth" % (args.arch, epoch)))
         if args.gpu:
             net = net.cuda()
 
