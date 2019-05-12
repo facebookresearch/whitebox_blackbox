@@ -83,14 +83,14 @@ for epoch in range(args.epochs):
         best_val = val_accuracy
     best_val = val_accuracy
 
-    if args.dest != "." and (epoch % 10 == 0 or epoch < 20):
+    if args.dest != "." and (epoch % 10 == 9 or epoch < 20):
         if args.gpu:
             net = net.cpu()
         print("Saving model")
         torch.save({
             'net': net.state_dict(),
             'args': args
-        }, join(args.dest, "%s_epoch=%d.pth" % (args.arch, epoch)))
+        }, join(args.dest, "%s_epoch=%d.pth" % (args.arch, epoch + 1)))
         if args.gpu:
             net = net.cuda()
 
