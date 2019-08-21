@@ -32,15 +32,11 @@ transform = getTransform(0)
 
 root_data = '/private/home/asablayrolles/data/cifar-dejalight2'
 nclasses = 10
-trainset = CIFAR10(root=root_data, name=args.name,
-                                        download=False, transform=transform)
-trainloader = torch.utils.data.DataLoader(trainset, batch_size=args.bs,
-                                          shuffle=True, num_workers=2)
+trainset = CIFAR10(root=root_data, name=args.name, transform=transform)
+trainloader = torch.utils.data.DataLoader(trainset, batch_size=args.bs, shuffle=True, num_workers=2)
 
-testset = CIFAR10(root=root_data, name='val',
-                                       download=False, transform=transform)
-testloader = torch.utils.data.DataLoader(testset, batch_size=args.bs,
-                                         shuffle=False, num_workers=2)
+testset = CIFAR10(root=root_data, name='val', transform=transform)
+testloader = torch.utils.data.DataLoader(testset, batch_size=args.bs, shuffle=False, num_workers=2)
 
 net = models.__dict__[args.arch](nclasses)
 criterion = nn.CrossEntropyLoss()

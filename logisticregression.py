@@ -73,7 +73,7 @@ if __name__ == "__main__":
         'method': 'malt'
     }))
 
-    # MATT use the Hessian to compute train_set membership
+    # MATT use a Taylor expansion to compute train_set membership
     y_bin = 2 * (y - 0.5).reshape(-1, 1)
     matt = computeMATT(X, y_bin, state.choice(public_set, ntrain, replace=False), model, params)
     map_train, map_test, acc = computeMetrics(matt[train_set], matt[test_set])
