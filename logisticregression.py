@@ -2,7 +2,8 @@ import numpy as np
 from os.path import join
 from sklearn.linear_model import LogisticRegression
 import argparse
-from functions import computeMATT, computeMetrics
+from functions import computeMATT
+from src.metrics import computeMetrics
 from lib.logger import create_logger
 from lib.utils import boolify
 

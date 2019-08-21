@@ -109,9 +109,9 @@ else:
     savecheck(join(dest, "label_public.npy"), label[idx_public])
 
     # validation set
-    savecheck(join(dest, "idx_val.npy"), idx_val)
-    savecheck(join(dest, "data_val.npy"), data[idx_val])
-    savecheck(join(dest, "label_val.npy"), label[idx_val])
+    savecheck(join(dest, "idx_valid.npy"), idx_val)
+    savecheck(join(dest, "data_valid.npy"), data[idx_val])
+    savecheck(join(dest, "label_valid.npy"), label[idx_val])
 
     # test set
     savecheck(join(dest, "idx_test.npy"), idx_test)

@@ -33,7 +33,6 @@ args = parser.parse_args()
 print(args)
 
 torch.cuda.manual_seed_all(args.seed)
-transform = getTransform(args.data_aug)
 
 nclasses = 100
 root_data = "/private/home/asablayrolles/data"

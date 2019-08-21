@@ -1,43 +1,45 @@
 import logging
 import time
-import datetime
-from .date import GMT1
+from datetime import timedelta
+
 
 class LogFormatter():
+
     def __init__(self):
         self.start_time = time.time()
-        self.gmt = GMT1()
 
     def format(self, record):
         elapsed_seconds = round(record.created - self.start_time)
 
         prefix = "%s - %s - %s" % (
             record.levelname,
-            datetime.datetime.now(tz=self.gmt).strftime('%x %X'),
-            datetime.timedelta(seconds=elapsed_seconds)
+            time.strftime('%x %X'),
+            timedelta(seconds=elapsed_seconds)
         )
         message = record.getMessage()
         message = message.replace('\n', '\n' + ' ' * (len(prefix) + 3))
-        return "%s - %s" % (prefix, message)
+        return "%s - %s" % (prefix, message) if message else ''
 
 
-def create_logger(filepath="", vb=2):
+def create_logger(filepath, rank):
     """
     Create a logger.
+    Use a different log file for each process.
     """
     # create log formatter
     log_formatter = LogFormatter()
 
-    if filepath != "":
-        # create file handler and set level to debug
+    # create file handler and set level to debug
+    if filepath is not None:
+        if rank > 0:
+            filepath = '%s-%i' % (filepath, rank)
         file_handler = logging.FileHandler(filepath, "a")
-        file_handler.setLevel(logging.INFO)
+        file_handler.setLevel(logging.DEBUG)
         file_handler.setFormatter(log_formatter)
 
     # create console handler and set level to info
-    log_level = logging.DEBUG if vb == 2 else logging.INFO if vb == 1 else logging.WARNING
     console_handler = logging.StreamHandler()
-    console_handler.setLevel(log_level)
+    console_handler.setLevel(logging.INFO)
     console_handler.setFormatter(log_formatter)
 
     # create logger and set level to debug
@@ -45,7 +47,7 @@ def create_logger(filepath="", vb=2):
     logger.handlers = []
     logger.setLevel(logging.DEBUG)
     logger.propagate = False
-    if filepath != "":
+    if filepath is not None:
         logger.addHandler(file_handler)
     logger.addHandler(console_handler)
 
