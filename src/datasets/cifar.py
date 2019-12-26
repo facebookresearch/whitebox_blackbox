@@ -8,9 +8,8 @@ import torchvision
 
 
 class CIFAR10(torchvision.datasets.CIFAR10):
-    def __init__(self, root, name,
-                 transform=None, target_transform=None,
-                 download=False):
+    
+    def __init__(self, root, name, transform=None, target_transform=None):
 
         self.root = os.path.expanduser(root)
         self.transform = transform
