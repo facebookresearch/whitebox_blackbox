@@ -31,10 +31,16 @@ DUMP_PATH = DUMP_PATH % getpass.getuser()
 logger = getLogger()
 
 
-def boolify(x):
-    assert x in ["yes", "no"]
-
-    return x == "yes"
+def bool_flag(s):
+    """
+    Parse boolean arguments from the command line.
+    """
+    if s.lower() in FALSY_STRINGS:
+        return False
+    elif s.lower() in TRUTHY_STRINGS:
+        return True
+    else:
+        raise argparse.ArgumentTypeError("invalid value for a boolean flag")
 
 
 class FlattenLayer(nn.Module):

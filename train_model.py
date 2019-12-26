@@ -1,93 +1,131 @@
 from __future__ import division
-import time
-import torch
-import torch.optim as optim
-import torch.nn as nn
 import argparse
-from os.path import join
-from lib.utils import test, getTransform
-from lib.datasets.cifar import CIFAR10
-from lib import models
+import json
+import torch
+import torch.nn as nn
 
-model_names = sorted(name for name in models.__dict__
-    if name.islower() and not name.startswith("__")
-    and callable(models.__dict__[name]))
+from src.datasets.cifar import CIFAR10
+from src.evaluator import Evaluator
+from src.metrics import computeMetrics
+from src.model import build_model
+from src.net import extractFeatures
+from src.trainer import Trainer
+from src.utils import bool_flag, initialize_exp, init_distributed_mode
+from src.utils import getTransform
 
-parser = argparse.ArgumentParser()
-parser.add_argument("--arch", type=str, choices=model_names)
-parser.add_argument("--bs", type=int, default=4)
-parser.add_argument("--dest", type=str, default=".")
-parser.add_argument("--epochs", type=int, default=50)
-parser.add_argument("--gpu", action='store_true', dest='gpu')
-parser.add_argument("--lr", type=float, default=0.001)
-parser.add_argument("--momentum", type=float, default=0.9)
-parser.add_argument("--name", type=str, required=True)
-parser.add_argument("--seed", type=int, default=0)
-parser.set_defaults(gpu=True)
-args = parser.parse_args()
-print(args)
 
-torch.cuda.manual_seed_all(args.seed)
-transform = getTransform(0)
+def mast_topline(model, train_data_loader, valid_data_loader):
+    model = model.eval()
+    criterion = nn.CrossEntropyLoss(reduction='none')
 
-root_data = '/private/home/asablayrolles/data/cifar-dejalight2'
-nclasses = 10
-trainset = CIFAR10(root=root_data, name=args.name, transform=transform)
-trainloader = torch.utils.data.DataLoader(trainset, batch_size=args.bs, shuffle=True, num_workers=2)
+    train_logits, train_lbl = extractFeatures(train_data_loader, model)
+    valid_logits, valid_lbl = extractFeatures(valid_data_loader, model)
 
-testset = CIFAR10(root=root_data, name='val', transform=transform)
-testloader = torch.utils.data.DataLoader(testset, batch_size=args.bs, shuffle=False, num_workers=2)
+    train_losses = criterion(train_logits, train_lbl)
+    valid_losses = criterion(valid_logits, valid_lbl)
 
-net = models.__dict__[args.arch](nclasses)
-criterion = nn.CrossEntropyLoss()
-optimizer = optim.SGD(net.parameters(), lr=args.lr, momentum=args.momentum)
-if args.gpu:
-    net = net.cuda()
-    criterion = criterion.cuda()
+    map_train, map_test, acc = computeMetrics(- train_losses, - valid_losses)
 
-best_val = None
-for epoch in range(args.epochs):
-    start = time.time()
-    net = net.train()
-    avg_loss = 0
-    for i, data in enumerate(trainloader, 0):
-        inputs, labels = data
-        if args.gpu:
-            inputs, labels = inputs.cuda(), labels.cuda()
+    return acc
 
-        optimizer.zero_grad()
-        outputs = net(inputs)
-        loss = criterion(outputs, labels)
-        loss.backward()
-        optimizer.step()
 
-        avg_loss += loss.data.item()
+def get_parser():
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--gpu", type=bool_flag, default=True)
+    parser.add_argument("--seed", type=int, default=0)
+    parser.add_argument("--dump_path", type=str, default="")
+    parser.add_argument("--exp_name", type=str, default="bypass")
+    parser.add_argument("--save_periodic", type=int, default=0)
+    parser.add_argument("--exp_id", type=str, default="")
+    parser.add_argument("--debug_train", type=bool_flag, default=False)
+    parser.add_argument("--debug_slurm", type=bool_flag, default=False)
 
-    avg_loss /= len(trainloader)
-    net = net.eval()
-    val_accuracy = test(net, testloader, args.gpu)
 
-    print("Epoch %d, took %.2f, loss=%.2f, train acc=%.2f, val acc=%.2f" % (
-        epoch,
-        time.time() - start,
-        avg_loss,
-        test(net, trainloader, args.gpu),
-        val_accuracy
-    ))
+    # Data
+    parser.add_argument("--name", type=str, required=True)
 
-    if best_val is None:
-        best_val = val_accuracy
-    best_val = val_accuracy
+    # Learning algorithm
+    parser.add_argument("--batch_size", type=int, default=4)
+    parser.add_argument("--epochs", type=int, default=50)
+    parser.add_argument("--optimizer", type=str, default="sgd,lr=0.001,momentum=0.9,weight_decay=0.0001")
+    parser.add_argument("--validation_metrics", type=str, default="")
 
-    if args.dest != "." and (epoch % 10 == 9 or epoch < 20):
-        if args.gpu:
-            net = net.cpu()
-        print("Saving model")
-        torch.save({
-            'net': net.state_dict(),
-            'args': args
-        }, join(args.dest, "%s_epoch=%d.pth" % (args.arch, epoch + 1)))
-        if args.gpu:
-            net = net.cuda()
+    # Model
+    parser.add_argument("--architecture", type=str)
+    parser.add_argument("--non_linearity", type=str, choices=["relu", "tanh"])
+    parser.add_argument("--num_classes", type=int, default=10)
+    parser.add_argument("--num_channels", type=int, default=32)
+    parser.add_argument("--num_fc", type=int, default=128)
+    parser.add_argument("--maxpool_size", type=int, default=4)
 
-print('Finished Training')
+        # multi-gpu / multi-node
+    parser.add_argument("--local_rank", type=int, default=-1)
+    parser.add_argument("--master_port", type=int, default=-1)
+
+
+    return parser
+
+
+def main(params):
+    init_distributed_mode(params)
+
+    logger = initialize_exp(params)
+
+    torch.cuda.manual_seed_all(params.seed)
+    transform = getTransform(0)
+
+    root_data = '/private/home/asablayrolles/data/cifar-dejalight2'
+    trainset = CIFAR10(root=root_data, name=params.name, transform=transform)
+    trainloader = torch.utils.data.DataLoader(trainset, batch_size=params.batch_size, shuffle=True, num_workers=2)
+
+    valid_set = CIFAR10(root=root_data, name='public_0', transform=transform)
+    valid_data_loader = torch.utils.data.DataLoader(valid_set, batch_size=params.batch_size, shuffle=False, num_workers=2)
+
+    model = build_model(params)
+    if params.gpu:
+        model = model.cuda()
+
+    # criterion = nn.CrossEntropyLoss()
+    # optimizer = optim.SGD(model.parameters(), lr=params.lr, momentum=params.momentum)
+
+    trainer = Trainer(model=model, params=params)
+    evaluator = Evaluator(trainer, params)
+
+    for epoch in range(params.epochs):
+        trainer.update_learning_rate()
+        for images, targets in trainloader:
+            trainer.classif_step(images, targets)
+
+        # evaluate classification accuracy
+        scores = evaluator.run_all_evals(trainer, evals=['classif'], data_loader=valid_data_loader)
+
+        for name, val in trainer.get_scores().items():
+            scores[name] = val
+
+
+        accuracy = mast_topline(model, trainloader, valid_data_loader)
+        print(f"Guessing accuracy: {accuracy}")
+
+        scores["mast"] = accuracy
+        # print / JSON log
+        for k, v in scores.items():
+            logger.info('%s -> %.6f' % (k, v))
+
+        if params.is_master:
+            logger.info("__log__:%s" % json.dumps(scores))
+
+        # end of epoch
+        trainer.save_best_model(scores)
+        trainer.save_periodic()
+        trainer.end_epoch(scores)
+
+    print('Finished Training')
+
+
+if __name__ == "__main__":
+    parser = get_parser()
+
+    params = parser.parse_args()
+    print(params)
+
+    main(params)

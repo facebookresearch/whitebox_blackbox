@@ -45,7 +45,7 @@ class Evaluator(object):
         topk = [k for k in topk if k <= params.num_classes]
 
         for images, targets in data_loader:
-            images = images.cuda().half() if params.fp16 else images.cuda()
+            images = images.cuda()
             output = self.model(images)
             accuracies.append(accuracy(output.cpu(), targets, topk=tuple(topk)))
 

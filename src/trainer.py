@@ -21,28 +21,12 @@ class Trainer(object):
         # pretrained model / model / params
         self.model = model
         self.params = params
-        assert params.fp16 is False
 
         # set parameters
         self.set_parameters()
 
         # set optimizers
         self.set_optimizers()
-
-        # stopping criterion used for early stopping
-        if params.stopping_criterion != '':
-            split = params.stopping_criterion.split(',')
-            assert len(split) == 2 and split[1].isdigit()
-            self.decrease_counts_max = int(split[1])
-            self.decrease_counts = 0
-            if split[0][0] == '_':
-                self.stopping_criterion = (split[0][1:], False)
-            else:
-                self.stopping_criterion = (split[0], True)
-            self.best_stopping_criterion = -1e12 if self.stopping_criterion[1] else 1e12
-        else:
-            self.stopping_criterion = None
-            self.best_stopping_criterion = None
 
         # validation metrics
         self.metrics = []
@@ -108,7 +92,7 @@ class Trainer(object):
         """
         Sets the learning rate to the initial LR decayed by 10 every 30 epochs.
         """
-        for name in ['model', 'query', 'value']:
+        for name in ['model']:
             schedule = self.schedules.get(name, None)
             if schedule is None:
                 return
@@ -179,7 +163,6 @@ class Trainer(object):
             'model': self.model.state_dict(),
             'epoch': self.epoch,
             'best_metrics': self.best_metrics,
-            'best_stopping_criterion': self.best_stopping_criterion,
             'params': vars(self.params)
         }
         for k, v in self.optimizers.items():
@@ -213,7 +196,6 @@ class Trainer(object):
         # reload main metrics
         self.epoch = data['epoch'] + 1
         self.best_metrics = data['best_metrics']
-        self.best_stopping_criterion = data['best_stopping_criterion']
         logger.warning('Checkpoint reloaded. Resuming at epoch %i ...' % self.epoch)
 
     def save_periodic(self):
@@ -244,23 +226,6 @@ class Trainer(object):
         End the epoch.
         """
         # stop if the stopping criterion has not improved after a certain number of epochs
-        if self.stopping_criterion is not None:
-            metric, biggest = self.stopping_criterion
-            assert metric in scores, metric
-            factor = 1 if biggest else -1
-            if factor * scores[metric] > factor * self.best_stopping_criterion:
-                self.best_stopping_criterion = scores[metric]
-                logger.info("New best validation score: %f" % self.best_stopping_criterion)
-                self.decrease_counts = 0
-            else:
-                logger.info("Not a better validation score (%i / %i)."
-                            % (self.decrease_counts, self.decrease_counts_max))
-                self.decrease_counts += 1
-            if self.decrease_counts > self.decrease_counts_max:
-                logger.info("Stopping criterion has been below its best value for more "
-                            "than %i epochs. Ending the experiment..." % self.decrease_counts_max)
-                exit()
-
         for k in self.stats.keys():
             if type(self.stats[k]) is list:
                 del self.stats[k][:]
@@ -281,14 +246,11 @@ class Trainer(object):
         for name in self.optimizers.keys():
             self.optimizers[name].zero_grad()
 
-        if self.params.fp16:
-            list(self.optimizers.values())[0].backward(loss)
-        else:
-            loss.backward()
+        loss.backward()
 
         for name in self.optimizers.keys():
             self.optimizers[name].step()
-            
+
 
     def classif_step(self, images, targets):
         """
@@ -299,12 +261,14 @@ class Trainer(object):
         self.model.train()
 
         # batch
-        images = images.cuda(non_blocking=True).half() if params.fp16 else images.cuda(non_blocking=True)
+        if params.gpu:
+            images = images.cuda(non_blocking=True)
+            targets = targets.cuda(non_blocking=True)
 
         # forward / loss / optimize
         output = self.model(images)
 
-        loss = F.cross_entropy(output, targets.cuda(non_blocking=True), reduction='mean')
+        loss = F.cross_entropy(output, targets, reduction='mean')
         self.optimize(loss)
 
         # statistics

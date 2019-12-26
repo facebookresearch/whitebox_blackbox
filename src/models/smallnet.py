@@ -1,18 +1,25 @@
 import torch.nn as nn
 
 class SmallNet(nn.Module):
-    def __init__(self, nclasses, nfeat=32):
+    def __init__(self, num_classes, num_channels, num_fc, maxpool_size, non_linearity):
         super(SmallNet, self).__init__()
 
-        self.conv = nn.Sequential(
-            nn.Conv2d(3, nfeat, kernel_size=5, padding=2),
-            nn.Tanh(),
-            nn.MaxPool2d(kernel_size=4, stride=4),
-            nn.Conv2d(nfeat, nfeat, kernel_size=5, padding=2),
-            nn.Tanh(),
-            nn.MaxPool2d(kernel_size=4, stride=4))
+        if non_linearity == "tanh":
+            nonlinear_layer = nn.Tanh()
+        elif non_linearity == "relu":
+            nonlinear_layer = nn.ReLU()
+        else:
+            raise NotImplementedError()
 
-        self.fc = [nn.Linear(2*2*nfeat, 128), nn.Tanh(), nn.Linear(128, nclasses)]
+        self.conv = nn.Sequential(
+            nn.Conv2d(3, num_channels, kernel_size=5, padding=2),
+            nonlinear_layer,
+            nn.MaxPool2d(kernel_size=maxpool_size),
+            nn.Conv2d(num_channels, num_channels, kernel_size=5, padding=2),
+            nonlinear_layer,
+            nn.MaxPool2d(kernel_size=maxpool_size))
+
+        self.fc = [nn.Linear(32 * 32 // (maxpool_size**4) * num_channels, num_fc), nonlinear_layer, nn.Linear(num_fc, num_classes)]
         self.fc = nn.Sequential(*self.fc)
 
 
@@ -23,5 +30,5 @@ class SmallNet(nn.Module):
 
         return x
 
-def smallnet(nclasses=10):
-    return SmallNet(nclasses)
+def smallnet(num_classes, num_channels, num_fc, maxpool_size, non_linearity):
+    return SmallNet(num_classes, num_channels, num_fc, maxpool_size, non_linearity)

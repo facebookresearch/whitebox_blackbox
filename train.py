@@ -12,7 +12,6 @@ from src.dataset import get_data_loader
 import warnings
 
 import apex
-from src.fp16 import network_to_half
 
 warnings.filterwarnings("ignore", "(Possibly )?corrupt EXIF data", UserWarning)
 warnings.filterwarnings("ignore", "Metadata Warning, tag [0-9]+ had too many entries", UserWarning)
@@ -35,8 +34,6 @@ def get_parser():
                         help="Experiment ID")
     parser.add_argument("--nb_workers", type=int, default=10,
                         help="Number of workers")
-    parser.add_argument("--fp16", type=bool_flag, default=False,
-                        help='Run model with float16')
 
     # dataset
     parser.add_argument("--dataset", choices=["imagenet", "cifar10", "cifar100"], default="imagenet",
@@ -65,8 +62,6 @@ def get_parser():
                         help="Number of epochs")
     parser.add_argument("--validation_metrics", type=str, default="",
                         help="Validation metrics")
-    parser.add_argument("--stopping_criterion", type=str, default="",
-                        help="Stopping criterion, and number of non-increase before stopping the experiment")
 
     # evaluation
     parser.add_argument("--eval_only", type=bool_flag, default=False,
@@ -146,18 +141,10 @@ def main(params):
     model = build_model(params)
     model.cuda()
 
-    # float16
-    if params.fp16:
-        assert torch.backends.cudnn.enabled
-        model = network_to_half(model)
-
     # distributed  # TODO: check this https://github.com/NVIDIA/apex/blob/master/examples/imagenet/main.py#L142
     if params.multi_gpu:
         logger.info("Using nn.parallel.DistributedDataParallel ...")
-        if params.fp16:
-            model = apex.parallel.DistributedDataParallel(model, delay_allreduce=True)
-        else:
-            model = nn.parallel.DistributedDataParallel(model, device_ids=[params.local_rank], output_device=params.local_rank, broadcast_buffers=True)
+        model = nn.parallel.DistributedDataParallel(model, device_ids=[params.local_rank], output_device=params.local_rank, broadcast_buffers=True)
 
     # build trainer / reload potential checkpoints / build evaluator
     trainer = Trainer(model=model, params=params)
