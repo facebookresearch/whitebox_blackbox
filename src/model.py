@@ -17,7 +17,7 @@ def build_model(params, num_outputs=None):
     assert arch in architectures
 
     if arch == "smallnet":
-        model = smallnet(params.num_classes, params.num_channels, params.num_fc, params.maxpool_size, params.non_linearity)
+        model = smallnet(params.num_classes, params.num_channels, params.num_fc, params.maxpool_size, params.kernel_size, params.non_linearity)
     else:
         model = models.__dict__[arch]()
 

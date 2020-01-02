@@ -15,8 +15,8 @@ class CIFAR10(torchvision.datasets.CIFAR10):
         self.transform = transform
         self.target_transform = target_transform
 
-        self.data = np.load(join(self.root, "data_%s.npy" % name))[::2]
-        self.labels = np.load(join(self.root, "label_%s.npy" % name))[::2]
+        self.data = np.load(join(self.root, "data_%s.npy" % name))#[::2]
+        self.labels = np.load(join(self.root, "label_%s.npy" % name))#[::2]
 
     def __getitem__(self, index):
         """

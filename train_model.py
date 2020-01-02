@@ -57,6 +57,7 @@ def get_parser():
     parser.add_argument("--num_channels", type=int, default=32)
     parser.add_argument("--num_fc", type=int, default=128)
     parser.add_argument("--maxpool_size", type=int, default=4)
+    parser.add_argument("--kernel_size", type=int, default=5)
 
         # multi-gpu / multi-node
     parser.add_argument("--local_rank", type=int, default=-1)
@@ -101,7 +102,6 @@ def main(params):
 
         for name, val in trainer.get_scores().items():
             scores[name] = val
-
 
         accuracy = mast_topline(model, trainloader, valid_data_loader)
         print(f"Guessing accuracy: {accuracy}")

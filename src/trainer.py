@@ -45,6 +45,7 @@ class Trainer(object):
             [('processed_i', 0)] +
             [('MSE', [])] +
             [('XE', [])] +
+            [('train_accuracy', [])] +
             [('time', [])]
         )
         self.last_time = time.time()
@@ -274,6 +275,7 @@ class Trainer(object):
         # statistics
         self.stats['processed_i'] += params.batch_size
         self.stats['XE'].append(loss.item())
+        self.stats['train_accuracy'].append(torch.mean((output.argmax(dim=1) == targets).float()).item())
         self.stats['time'].append(time.time() - start)
 
 
