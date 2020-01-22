@@ -28,10 +28,14 @@ def computeMetrics(indicator_train, indicator_test):
     order = np.argsort(np.concatenate([indicator_train, indicator_test]))
     gt = np.concatenate([np.ones_like(indicator_train), np.zeros_like(indicator_test)])
 
-    accuracies = [(np.sum(gt[order[:n0]] == 0) + np.sum(gt[order[n0:]] == 1)) for n0 in range(gt.shape[0])]
+    accuracies = [np.sum(gt[order[:n0]] == 0) + np.sum(gt[order[n0:]] == 1) for n0 in range(gt.shape[0])]
 
     map_train = float(100 * computemAP(gt[order][None,::-1]))
     map_test =  float(100 * computemAP(1 - gt[order][None,:]))
     acc =       float(100 * np.max(accuracies) / gt.shape[0])
 
-    return map_train, map_test, acc
+    cutoff = np.argmax(accuracies)
+    precision_train = float(np.mean(gt[order[cutoff:]]))
+    recall_train = float(np.sum(gt[order[cutoff:]]) / np.sum(gt))
+
+    return map_train, map_test, acc, precision_train, recall_train

@@ -24,9 +24,9 @@ def mast_topline(model, train_data_loader, valid_data_loader):
     train_losses = criterion(train_logits, train_lbl)
     valid_losses = criterion(valid_logits, valid_lbl)
 
-    map_train, map_test, acc = computeMetrics(- train_losses, - valid_losses)
+    map_train, map_test, acc, precision_train, recall_train = computeMetrics(- train_losses, - valid_losses)
 
-    return acc
+    return acc, precision_train, recall_train
 
 
 def get_parser():
@@ -103,10 +103,13 @@ def main(params):
         for name, val in trainer.get_scores().items():
             scores[name] = val
 
-        accuracy = mast_topline(model, trainloader, valid_data_loader)
+        accuracy, precision_train, recall_train = mast_topline(model, trainloader, valid_data_loader)
         print(f"Guessing accuracy: {accuracy}")
 
-        scores["mast"] = accuracy
+        scores["mast_accuracy"] = accuracy
+        scores["mast_precision_train"] = precision_train
+        scores["mast_recall_train"] = recall_train
+        
         # print / JSON log
         for k, v in scores.items():
             logger.info('%s -> %.6f' % (k, v))
